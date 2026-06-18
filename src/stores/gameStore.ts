@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { TimeOfDay, ActionType, GameEventConfig, EventChoice } from '../types/game'
+import type { TimeOfDay, ActionType, GameEventConfig, EventChoice, TutorialState, TutorialStepType, TutorialStep } from '../types/game'
 import gameConfig from '../config/gameConfig'
 import {
   clamp,
@@ -25,7 +25,7 @@ export interface LogEntry {
   id: number
   day: number
   time: TimeOfDay
-  type: 'action' | 'event' | 'system' | 'story'
+  type: 'action' | 'event' | 'system' | 'story' | 'tip'
   message: string
   characterId?: string
   timestamp: number
@@ -41,6 +41,7 @@ export interface HistorySnapshot {
   triggeredEvents: string[]
   collectedCards: string[]
   logs: LogEntry[]
+  tutorial: TutorialState
 }
 
 export const useGameStore = defineStore('game', () => {
@@ -69,6 +70,14 @@ export const useGameStore = defineStore('game', () => {
   const history = ref<HistorySnapshot[]>([])
   let logIdCounter = 0
 
+  const tutorial = ref<TutorialState>({
+    currentStep: null,
+    completedSteps: [],
+    unlockedActions: [],
+    tutorialCompleted: false,
+    showGuide: false
+  })
+
   const unlockedCharacters = computed(() =>
     characters.value.filter(c => c.unlocked)
   )
@@ -80,6 +89,22 @@ export const useGameStore = defineStore('game', () => {
   const currentCharacterConfig = computed(() =>
     gameConfig.characters.find(c => c.id === selectedCharacterId.value) || null
   )
+
+  const currentTutorialStep = computed((): TutorialStep | null => {
+    if (!tutorial.value.currentStep) return null
+    return gameConfig.tutorial.find(s => s.id === tutorial.value.currentStep) || null
+  })
+
+  const tutorialProgress = computed(() => {
+    const total = gameConfig.tutorial.length
+    const completed = tutorial.value.completedSteps.length
+    return { total, completed, percent: Math.round((completed / total) * 100) }
+  })
+
+  function isActionUnlocked(actionType: ActionType): boolean {
+    if (tutorial.value.tutorialCompleted) return true
+    return tutorial.value.unlockedActions.includes(actionType)
+  }
 
   function addLog(type: LogEntry['type'], message: string, characterId?: string) {
     logs.value.push({
@@ -103,7 +128,8 @@ export const useGameStore = defineStore('game', () => {
       flags: [...flags.value],
       triggeredEvents: [...triggeredEvents.value],
       collectedCards: [...collectedCards.value],
-      logs: JSON.parse(JSON.stringify(logs.value))
+      logs: JSON.parse(JSON.stringify(logs.value)),
+      tutorial: JSON.parse(JSON.stringify(tutorial.value))
     })
     if (history.value.length > 100) {
       history.value.shift()
@@ -122,8 +148,104 @@ export const useGameStore = defineStore('game', () => {
     triggeredEvents.value = [...snapshot.triggeredEvents]
     collectedCards.value = [...snapshot.collectedCards]
     logs.value = JSON.parse(JSON.stringify(snapshot.logs))
+    tutorial.value = JSON.parse(JSON.stringify(snapshot.tutorial))
     history.value = history.value.slice(0, stepIndex)
     addLog('system', `回退到第 ${snapshot.day} 天 ${getTimeLabel(snapshot.timeSlot)}`)
+  }
+
+  function checkTutorialStepCondition(step: TutorialStep): boolean {
+    const cond = step.triggerCondition
+    if (!cond) return true
+
+    if (cond.day !== undefined && day.value < cond.day) return false
+    if (cond.timeSlot !== undefined && timeSlot.value !== cond.timeSlot) return false
+
+    if (cond.action) {
+      const actionSteps = ['unlock_action_chat', 'unlock_action_gift', 'unlock_action_work']
+      const actionMap: Record<string, string> = {
+        chat: 'unlock_action_chat',
+        gift: 'unlock_action_gift',
+        work: 'unlock_action_work'
+      }
+      const requiredStep = actionMap[cond.action]
+      if (requiredStep && !tutorial.value.completedSteps.includes(requiredStep as TutorialStepType)) {
+        return false
+      }
+    }
+
+    if (cond.eventTriggered && triggeredEvents.value.length === 0) {
+      return false
+    }
+
+    return true
+  }
+
+  function advanceTutorial() {
+    if (tutorial.value.tutorialCompleted) return
+
+    const nextIndex = tutorial.value.completedSteps.length
+    if (nextIndex >= gameConfig.tutorial.length) {
+      tutorial.value.tutorialCompleted = true
+      tutorial.value.currentStep = null
+      tutorial.value.showGuide = false
+      return
+    }
+
+    const nextStep = gameConfig.tutorial[nextIndex]
+    if (!checkTutorialStepCondition(nextStep)) {
+      tutorial.value.currentStep = null
+      tutorial.value.showGuide = false
+      return
+    }
+
+    tutorial.value.currentStep = nextStep.id
+    tutorial.value.showGuide = true
+
+    if (nextStep.unlockActions) {
+      nextStep.unlockActions.forEach(action => {
+        if (!tutorial.value.unlockedActions.includes(action)) {
+          tutorial.value.unlockedActions.push(action)
+        }
+      })
+    }
+  }
+
+  function completeCurrentTutorialStep() {
+    if (!tutorial.value.currentStep) return
+    if (!tutorial.value.completedSteps.includes(tutorial.value.currentStep)) {
+      const step = currentTutorialStep.value
+      if (step?.isKeyTip) {
+        addLog('tip', `💡 新手指南：${step.title} - ${step.content.replace(/\n/g, ' ')}`)
+      }
+      tutorial.value.completedSteps.push(tutorial.value.currentStep)
+    }
+    tutorial.value.showGuide = false
+    advanceTutorial()
+  }
+
+  function skipTutorial() {
+    tutorial.value.tutorialCompleted = true
+    tutorial.value.currentStep = null
+    tutorial.value.showGuide = false
+    tutorial.value.unlockedActions = ['chat', 'gift', 'work']
+    addLog('system', '已跳过新手引导')
+  }
+
+  function hideTutorialGuide() {
+    tutorial.value.showGuide = false
+  }
+
+  function showTutorialGuide() {
+    if (tutorial.value.currentStep && !tutorial.value.tutorialCompleted) {
+      tutorial.value.showGuide = true
+    }
+  }
+
+  function initTutorial() {
+    if (tutorial.value.tutorialCompleted) return
+    if (tutorial.value.completedSteps.length === 0) {
+      advanceTutorial()
+    }
   }
 
   function getCharacterState(id: string): CharacterState | undefined {
@@ -399,6 +521,10 @@ export const useGameStore = defineStore('game', () => {
     currentEvent.value = null
     showEventModal.value = false
 
+    if (!tutorial.value.tutorialCompleted) {
+      advanceTutorial()
+    }
+
     if (choice.nextEventId) {
       const nextEvent = gameConfig.events.find(e => e.id === choice.nextEventId)
       if (nextEvent) {
@@ -411,6 +537,9 @@ export const useGameStore = defineStore('game', () => {
     const char = characters.value.find(c => c.id === id)
     if (char && char.unlocked) {
       selectedCharacterId.value = id
+      if (!tutorial.value.tutorialCompleted) {
+        advanceTutorial()
+      }
     }
   }
 
@@ -441,7 +570,16 @@ export const useGameStore = defineStore('game', () => {
     history.value = []
     logIdCounter = 0
 
+    tutorial.value = {
+      currentStep: null,
+      completedSteps: [],
+      unlockedActions: [],
+      tutorialCompleted: false,
+      showGuide: false
+    }
+
     addLog('system', '🎮 游戏开始！欢迎来到恋爱物语')
+    initTutorial()
     checkAndTriggerEvent()
   }
 
@@ -449,6 +587,7 @@ export const useGameStore = defineStore('game', () => {
     if (logs.value.length === 0) {
       addLog('system', '🎮 游戏开始！欢迎来到恋爱物语')
     }
+    initTutorial()
     checkAndTriggerEvent()
   }
 
@@ -470,6 +609,9 @@ export const useGameStore = defineStore('game', () => {
     currentEvent,
     showEventModal,
     darkMode,
+    tutorial,
+    currentTutorialStep,
+    tutorialProgress,
     addLog,
     saveHistory,
     rollbackToStep,
@@ -482,6 +624,12 @@ export const useGameStore = defineStore('game', () => {
     toggleDarkMode,
     resetGame,
     initGame,
-    checkAndTriggerEvent
+    checkAndTriggerEvent,
+    isActionUnlocked,
+    completeCurrentTutorialStep,
+    skipTutorial,
+    hideTutorialGuide,
+    showTutorialGuide,
+    advanceTutorial
   }
 })

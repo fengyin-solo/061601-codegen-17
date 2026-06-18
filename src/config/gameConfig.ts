@@ -305,7 +305,91 @@ export const gameConfig: GameConfig = {
     { type: 'work', name: '打工', icon: '💼', description: '辛苦工作赚取代币', energyCost: 2 }
   ],
 
-  workRewards: { min: 15, max: 35 }
+  workRewards: { min: 15, max: 35 },
+
+  tutorial: [
+    {
+      id: 'welcome',
+      title: '欢迎来到恋爱物语',
+      content: '这里是一个充满浪漫邂逅的世界。在接下来的日子里，你将遇到性格各异的角色，与她们共同书写属于你们的故事。让我来带你熟悉一下这个世界吧~',
+      emoji: '💝',
+      isKeyTip: true
+    },
+    {
+      id: 'select_character',
+      title: '选择心仪的对象',
+      content: '在左侧的角色面板中，你可以看到目前已登场的角色。点击角色头像来选择想要互动的对象，每位角色都有独特的性格和喜好哦！',
+      emoji: '👆',
+      highlightSelector: '.character-panel',
+      isKeyTip: true
+    },
+    {
+      id: 'unlock_action_chat',
+      title: '初次交谈',
+      content: '很好！现在让我们来试试「聊天」功能吧。聊天可以增进与角色之间的好感度，但不同的话题会带来不同的效果。试试和角色聊聊天吧~',
+      emoji: '💬',
+      highlightSelector: '.action-btn.chat',
+      unlockActions: ['chat'],
+      triggerCondition: { day: 1, timeSlot: 'morning' },
+      isKeyTip: true
+    },
+    {
+      id: 'tip_event',
+      title: '剧情事件',
+      content: '随着时间推移和好感度变化，会触发各种精彩的剧情事件！在事件中做出的选择会影响故事走向，一定要谨慎选择哦。',
+      emoji: '📖',
+      triggerCondition: { eventTriggered: true },
+      isKeyTip: true
+    },
+    {
+      id: 'unlock_action_gift',
+      title: '赠送礼物',
+      content: '礼物是增进感情的好方法！每位角色都有自己喜欢和讨厌的礼物，送对了可以大幅提升好感度，送错了可就适得其反了。现在解锁「送礼」功能，去试试吧~',
+      emoji: '🎁',
+      highlightSelector: '.action-btn.gift',
+      unlockActions: ['gift'],
+      triggerCondition: { action: 'chat' },
+      isKeyTip: true
+    },
+    {
+      id: 'tip_resources',
+      title: '关于代币',
+      content: '送礼需要消耗代币💰。打工可以赚取代币，不过打工比较耗费体力，而且角色们的心情也会稍微下降。合理安排时间和资源是很重要的！',
+      emoji: '💰',
+      triggerCondition: { action: 'gift' }
+    },
+    {
+      id: 'unlock_action_work',
+      title: '努力工作',
+      content: '现在解锁「打工」功能。当你需要更多代币时，可以选择打工来赚取。注意：打工消耗2点行动力，比其他行动更累哦~',
+      emoji: '💼',
+      highlightSelector: '.action-btn.work',
+      unlockActions: ['work'],
+      triggerCondition: { day: 1, timeSlot: 'afternoon' },
+      isKeyTip: true
+    },
+    {
+      id: 'tip_mood',
+      title: '好感度与心情',
+      content: '每个角色都有好感度❤️和心情😊两个重要指标：\n• 好感度：决定你们的关系程度，达到特定值会解锁新卡牌\n• 心情：影响互动的效果，心情好时互动效果更好\n\n每天心情和好感度会略有下降，记得常和角色们互动哦！',
+      emoji: '❤️',
+      triggerCondition: { action: 'work' }
+    },
+    {
+      id: 'tip_save',
+      title: '存档与读档',
+      content: '游戏会在每天结束时自动存档。你也可以随时点击右上角的 💾 按钮手动保存。如果对选择不满意，还可以使用历史回退功能回到之前的状态。',
+      emoji: '💾',
+      highlightSelector: '.toolbar-btn'
+    },
+    {
+      id: 'complete',
+      title: '新手引导完成',
+      content: '恭喜你已经熟悉了所有基本操作！现在可以自由地探索这个世界了。祝你有一段美好的恋爱之旅~',
+      emoji: '🎉',
+      isKeyTip: true
+    }
+  ]
 }
 
 export default gameConfig

@@ -83,6 +83,32 @@ export interface ActionConfig {
   energyCost: number
 }
 
+export type TutorialStepType = 'welcome' | 'select_character' | 'unlock_action_chat' | 'unlock_action_gift' | 'unlock_action_work' | 'tip_resources' | 'tip_mood' | 'tip_event' | 'tip_save' | 'complete'
+
+export interface TutorialStep {
+  id: TutorialStepType
+  title: string
+  content: string
+  emoji: string
+  highlightSelector?: string
+  triggerCondition?: {
+    day?: number
+    timeSlot?: TimeOfDay
+    action?: ActionType
+    eventTriggered?: boolean
+  }
+  unlockActions?: ActionType[]
+  isKeyTip?: boolean
+}
+
+export interface TutorialState {
+  currentStep: TutorialStepType | null
+  completedSteps: TutorialStepType[]
+  unlockedActions: ActionType[]
+  tutorialCompleted: boolean
+  showGuide: boolean
+}
+
 export interface GameConfig {
   title: string
   initialResources: number
@@ -101,4 +127,5 @@ export interface GameConfig {
   events: GameEventConfig[]
   actions: ActionConfig[]
   workRewards: { min: number; max: number }
+  tutorial: TutorialStep[]
 }

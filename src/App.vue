@@ -11,6 +11,7 @@ import SaveModal from './components/SaveModal.vue'
 import CardCollection from './components/CardCollection.vue'
 import HistoryPanel from './components/HistoryPanel.vue'
 import GiftModal from './components/GiftModal.vue'
+import TutorialGuide from './components/TutorialGuide.vue'
 
 const gameStore = useGameStore()
 const saveStore = useSaveStore()
@@ -29,6 +30,12 @@ watch(() => gameStore.day, () => {
 watch(theme, (newTheme) => {
   document.documentElement.setAttribute('data-theme', newTheme)
 })
+
+function reopenTutorial() {
+  if (!gameStore.tutorial.tutorialCompleted && gameStore.tutorial.completedSteps.length > 0) {
+    gameStore.showTutorialGuide()
+  }
+}
 
 onMounted(() => {
   document.documentElement.setAttribute('data-theme', theme.value)
@@ -54,6 +61,7 @@ onMounted(() => {
       @toggle-history="showHistory = true"
       @toggle-theme="gameStore.toggleDarkMode()"
       @reset="gameStore.resetGame()"
+      @toggle-tutorial="reopenTutorial"
     />
     
     <div class="main-content">
@@ -72,6 +80,7 @@ onMounted(() => {
     <CardCollection v-if="showCards" @close="showCards = false" />
     <HistoryPanel v-if="showHistory" @close="showHistory = false" />
     <GiftModal v-if="showGiftModal" @close="showGiftModal = false" />
+    <TutorialGuide />
   </div>
 </template>
 

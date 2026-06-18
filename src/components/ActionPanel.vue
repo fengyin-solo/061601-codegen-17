@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useGameStore } from '../stores/gameStore'
 import gameConfig from '../config/gameConfig'
+import type { ActionType } from '../types/game'
 
 const emit = defineEmits<{
   (e: 'open-gift'): void
@@ -10,16 +11,36 @@ const emit = defineEmits<{
 const gameStore = useGameStore()
 
 const canPerformAction = computed(() => gameStore.actionsRemaining > 0)
-
 const hasSelectedCharacter = computed(() => gameStore.selectedCharacterId !== null)
+
+function isActionUnlocked(actionType: ActionType): boolean {
+  return gameStore.isActionUnlocked(actionType)
+}
+
+function getActionLockMessage(actionType: ActionType): string {
+  const actionNames: Record<ActionType, string> = {
+    chat: '聊天',
+    gift: '送礼',
+    work: '打工'
+  }
+  return `「${actionNames[actionType]}」功能尚未解锁，继续完成新手引导即可解锁~`
+}
 
 function doChat() {
   if (!hasSelectedCharacter.value || !canPerformAction.value) return
+  if (!isActionUnlocked('chat')) return
   gameStore.performAction('chat', gameStore.selectedCharacterId!)
+}
+
+function doGift() {
+  if (!hasSelectedCharacter.value || !canPerformAction.value) return
+  if (!isActionUnlocked('gift')) return
+  emit('open-gift')
 }
 
 function doWork() {
   if (!canPerformAction.value) return
+  if (!isActionUnlocked('work')) return
   gameStore.performAction('work')
 }
 </script>
@@ -34,44 +55,73 @@ function doWork() {
     <div class="action-grid">
       <button 
         class="action-btn chat"
-        :disabled="!hasSelectedCharacter || !canPerformAction"
+        :class="{ locked: !isActionUnlocked('chat') }"
+        :disabled="!hasSelectedCharacter || !canPerformAction || !isActionUnlocked('chat')"
+        :title="!isActionUnlocked('chat') ? getActionLockMessage('chat') : ''"
         @click="doChat"
       >
-        <span class="action-icon">💬</span>
+        <span class="action-icon">
+          <span v-if="isActionUnlocked('chat')">💬</span>
+          <span v-else class="lock-icon">🔒</span>
+        </span>
         <span class="action-name">聊天</span>
-        <span class="action-desc">和角色聊天增进感情</span>
+        <span class="action-desc">
+          <span v-if="isActionUnlocked('chat')">和角色聊天增进感情</span>
+          <span v-else class="lock-text">完成引导后解锁</span>
+        </span>
         <span class="action-cost">消耗 1 行动力</span>
       </button>
 
       <button 
         class="action-btn gift"
-        :disabled="!hasSelectedCharacter || !canPerformAction"
-        @click="emit('open-gift')"
+        :class="{ locked: !isActionUnlocked('gift') }"
+        :disabled="!hasSelectedCharacter || !canPerformAction || !isActionUnlocked('gift')"
+        :title="!isActionUnlocked('gift') ? getActionLockMessage('gift') : ''"
+        @click="doGift"
       >
-        <span class="action-icon">🎁</span>
+        <span class="action-icon">
+          <span v-if="isActionUnlocked('gift')">🎁</span>
+          <span v-else class="lock-icon">🔒</span>
+        </span>
         <span class="action-name">送礼</span>
-        <span class="action-desc">送礼物给喜欢的人</span>
+        <span class="action-desc">
+          <span v-if="isActionUnlocked('gift')">送礼物给喜欢的人</span>
+          <span v-else class="lock-text">完成引导后解锁</span>
+        </span>
         <span class="action-cost">消耗 1 行动力</span>
       </button>
 
       <button 
         class="action-btn work"
-        :disabled="!canPerformAction"
+        :class="{ locked: !isActionUnlocked('work') }"
+        :disabled="!canPerformAction || !isActionUnlocked('work')"
+        :title="!isActionUnlocked('work') ? getActionLockMessage('work') : ''"
         @click="doWork"
       >
-        <span class="action-icon">💼</span>
+        <span class="action-icon">
+          <span v-if="isActionUnlocked('work')">💼</span>
+          <span v-else class="lock-icon">🔒</span>
+        </span>
         <span class="action-name">打工</span>
-        <span class="action-desc">努力工作赚取代币</span>
+        <span class="action-desc">
+          <span v-if="isActionUnlocked('work')">努力工作赚取代币</span>
+          <span v-else class="lock-text">完成引导后解锁</span>
+        </span>
         <span class="action-cost">消耗 2 行动力</span>
       </button>
     </div>
 
-    <div v-if="!hasSelectedCharacter" class="hint">
+    <div v-if="!hasSelectedCharacter && isActionUnlocked('chat')" class="hint">
       💡 请先选择一个角色进行互动
     </div>
 
     <div v-if="!canPerformAction" class="hint warning">
       ⚡ 今天的行动力已用完，等待明天吧~
+    </div>
+
+    <div v-if="!gameStore.tutorial.tutorialCompleted" class="tutorial-hint">
+      <span class="tip-icon">💡</span>
+      新手引导进行中（{{ gameStore.tutorialProgress.completed }}/{{ gameStore.tutorialProgress.total }}），完成引导解锁全部功能
     </div>
   </div>
 </template>
@@ -128,8 +178,22 @@ function doWork() {
   background: #dcfce7;
 }
 
+.action-btn.locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-btn.locked:disabled {
+  background: #f3f4f6;
+}
+
 .action-icon {
   font-size: 32px;
+  position: relative;
+}
+
+.lock-icon {
+  opacity: 0.5;
 }
 
 .action-name {
@@ -141,6 +205,11 @@ function doWork() {
   font-size: 12px;
   color: var(--text-secondary);
   text-align: center;
+}
+
+.lock-text {
+  color: #9ca3af;
+  font-style: italic;
 }
 
 .action-cost {
@@ -163,6 +232,22 @@ function doWork() {
 .hint.warning {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.tutorial-hint {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #eef2ff 0%, #fdf4ff 100%);
+  color: #6d28d9;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tip-icon {
+  font-size: 16px;
 }
 
 @media (max-width: 600px) {
