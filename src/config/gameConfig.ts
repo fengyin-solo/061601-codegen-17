@@ -330,7 +330,6 @@ export const gameConfig: GameConfig = {
       emoji: '💬',
       highlightSelector: '.action-btn.chat',
       unlockActions: ['chat'],
-      triggerCondition: { day: 1, timeSlot: 'morning' },
       isKeyTip: true
     },
     {
@@ -344,7 +343,7 @@ export const gameConfig: GameConfig = {
     {
       id: 'unlock_action_gift',
       title: '赠送礼物',
-      content: '礼物是增进感情的好方法！每位角色都有自己喜欢和讨厌的礼物，送对了可以大幅提升好感度，送错了可就适得其反了。现在解锁「送礼」功能，去试试吧~',
+      content: '聊天完成得很棒！礼物是增进感情的好方法。每位角色都有自己喜欢和讨厌的礼物，送对了可以大幅提升好感度，送错了可就适得其反了。现在解锁「送礼」功能，去试试吧~',
       emoji: '🎁',
       highlightSelector: '.action-btn.gift',
       unlockActions: ['gift'],
@@ -354,18 +353,18 @@ export const gameConfig: GameConfig = {
     {
       id: 'tip_resources',
       title: '关于代币',
-      content: '送礼需要消耗代币💰。打工可以赚取代币，不过打工比较耗费体力，而且角色们的心情也会稍微下降。合理安排时间和资源是很重要的！',
+      content: '送礼需要消耗代币💰。代币是有限的资源，当你需要更多时，可以通过「打工」来赚取。不过打工比较耗费体力，合理安排时间和资源是很重要的！',
       emoji: '💰',
       triggerCondition: { action: 'gift' }
     },
     {
       id: 'unlock_action_work',
       title: '努力工作',
-      content: '现在解锁「打工」功能。当你需要更多代币时，可以选择打工来赚取。注意：打工消耗2点行动力，比其他行动更累哦~',
+      content: '现在解锁「打工」功能。当你需要更多代币购买礼物时，可以选择打工来赚取。注意：打工消耗2点行动力，比其他行动更累哦，快去试试看吧~',
       emoji: '💼',
       highlightSelector: '.action-btn.work',
       unlockActions: ['work'],
-      triggerCondition: { day: 1, timeSlot: 'afternoon' },
+      triggerCondition: { action: 'gift' },
       isKeyTip: true
     },
     {
@@ -385,7 +384,7 @@ export const gameConfig: GameConfig = {
     {
       id: 'complete',
       title: '新手引导完成',
-      content: '恭喜你已经熟悉了所有基本操作！现在可以自由地探索这个世界了。祝你有一段美好的恋爱之旅~',
+      content: '恭喜你已经熟悉了所有基本操作！聊天、送礼、打工三大行动都已解锁，关键玩法也都了解了。现在可以自由地探索这个世界了，祝你有一段美好的恋爱之旅~',
       emoji: '🎉',
       isKeyTip: true
     }

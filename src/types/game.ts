@@ -105,6 +105,7 @@ export interface TutorialState {
   currentStep: TutorialStepType | null
   completedSteps: TutorialStepType[]
   unlockedActions: ActionType[]
+  performedActions: ActionType[]
   tutorialCompleted: boolean
   showGuide: boolean
 }

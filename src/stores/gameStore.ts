@@ -74,6 +74,7 @@ export const useGameStore = defineStore('game', () => {
     currentStep: null,
     completedSteps: [],
     unlockedActions: [],
+    performedActions: [],
     tutorialCompleted: false,
     showGuide: false
   })
@@ -153,6 +154,40 @@ export const useGameStore = defineStore('game', () => {
     addLog('system', `回退到第 ${snapshot.day} 天 ${getTimeLabel(snapshot.timeSlot)}`)
   }
 
+  function rebuildUnlockedActionsFromSteps() {
+    const unlocked: ActionType[] = []
+    for (let i = 0; i < tutorial.value.completedSteps.length; i++) {
+      const stepId = tutorial.value.completedSteps[i]
+      const stepConfig = gameConfig.tutorial.find(s => s.id === stepId)
+      if (stepConfig?.unlockActions) {
+        stepConfig.unlockActions.forEach(action => {
+          if (!unlocked.includes(action)) {
+            unlocked.push(action)
+          }
+        })
+      }
+    }
+    const nextIndex = tutorial.value.completedSteps.length
+    if (nextIndex < gameConfig.tutorial.length) {
+      const nextStep = gameConfig.tutorial[nextIndex]
+      if (nextStep?.unlockActions && nextStep.id === tutorial.value.currentStep) {
+        nextStep.unlockActions.forEach(action => {
+          if (!unlocked.includes(action)) {
+            unlocked.push(action)
+          }
+        })
+      }
+    }
+    tutorial.value.unlockedActions = unlocked
+  }
+
+  function recordPerformedAction(actionType: ActionType) {
+    if (!tutorial.value.performedActions.includes(actionType)) {
+      tutorial.value.performedActions.push(actionType)
+    }
+    advanceTutorial()
+  }
+
   function checkTutorialStepCondition(step: TutorialStep): boolean {
     const cond = step.triggerCondition
     if (!cond) return true
@@ -161,14 +196,7 @@ export const useGameStore = defineStore('game', () => {
     if (cond.timeSlot !== undefined && timeSlot.value !== cond.timeSlot) return false
 
     if (cond.action) {
-      const actionSteps = ['unlock_action_chat', 'unlock_action_gift', 'unlock_action_work']
-      const actionMap: Record<string, string> = {
-        chat: 'unlock_action_chat',
-        gift: 'unlock_action_gift',
-        work: 'unlock_action_work'
-      }
-      const requiredStep = actionMap[cond.action]
-      if (requiredStep && !tutorial.value.completedSteps.includes(requiredStep as TutorialStepType)) {
+      if (!tutorial.value.performedActions.includes(cond.action)) {
         return false
       }
     }
@@ -183,44 +211,64 @@ export const useGameStore = defineStore('game', () => {
   function advanceTutorial() {
     if (tutorial.value.tutorialCompleted) return
 
-    const nextIndex = tutorial.value.completedSteps.length
-    if (nextIndex >= gameConfig.tutorial.length) {
-      tutorial.value.tutorialCompleted = true
-      tutorial.value.currentStep = null
-      tutorial.value.showGuide = false
-      return
-    }
+    while (true) {
+      const nextIndex = tutorial.value.completedSteps.length
+      if (nextIndex >= gameConfig.tutorial.length) {
+        tutorial.value.tutorialCompleted = true
+        tutorial.value.currentStep = null
+        tutorial.value.showGuide = false
+        return
+      }
 
-    const nextStep = gameConfig.tutorial[nextIndex]
-    if (!checkTutorialStepCondition(nextStep)) {
-      tutorial.value.currentStep = null
-      tutorial.value.showGuide = false
-      return
-    }
+      const nextStep = gameConfig.tutorial[nextIndex]
 
-    tutorial.value.currentStep = nextStep.id
-    tutorial.value.showGuide = true
-
-    if (nextStep.unlockActions) {
-      nextStep.unlockActions.forEach(action => {
-        if (!tutorial.value.unlockedActions.includes(action)) {
-          tutorial.value.unlockedActions.push(action)
+      if (!checkTutorialStepCondition(nextStep)) {
+        if (tutorial.value.currentStep === nextStep.id) {
+          tutorial.value.currentStep = null
         }
-      })
+        tutorial.value.showGuide = false
+        return
+      }
+
+      if (tutorial.value.completedSteps.includes(nextStep.id)) {
+        continue
+      }
+
+      tutorial.value.currentStep = nextStep.id
+      tutorial.value.showGuide = true
+
+      if (nextStep.unlockActions) {
+        nextStep.unlockActions.forEach(action => {
+          if (!tutorial.value.unlockedActions.includes(action)) {
+            tutorial.value.unlockedActions.push(action)
+          }
+        })
+      }
+      return
     }
   }
 
   function completeCurrentTutorialStep() {
     if (!tutorial.value.currentStep) return
-    if (!tutorial.value.completedSteps.includes(tutorial.value.currentStep)) {
-      const step = currentTutorialStep.value
-      if (step?.isKeyTip) {
-        addLog('tip', `💡 新手指南：${step.title} - ${step.content.replace(/\n/g, ' ')}`)
-      }
-      tutorial.value.completedSteps.push(tutorial.value.currentStep)
+    if (tutorial.value.completedSteps.includes(tutorial.value.currentStep)) {
+      tutorial.value.showGuide = false
+      advanceTutorial()
+      return
     }
+
+    const stepId = tutorial.value.currentStep
+    const step = currentTutorialStep.value
+    if (step?.isKeyTip) {
+      addLog('tip', `💡 新手指南：${step.title} - ${step.content.replace(/\n/g, ' ')}`)
+    }
+    tutorial.value.completedSteps.push(stepId)
     tutorial.value.showGuide = false
-    advanceTutorial()
+
+    const stepConfig = gameConfig.tutorial.find(s => s.id === stepId)
+    const isUnlockStep = stepConfig && stepConfig.unlockActions && stepConfig.unlockActions.length > 0
+    if (!isUnlockStep) {
+      advanceTutorial()
+    }
   }
 
   function skipTutorial() {
@@ -228,6 +276,7 @@ export const useGameStore = defineStore('game', () => {
     tutorial.value.currentStep = null
     tutorial.value.showGuide = false
     tutorial.value.unlockedActions = ['chat', 'gift', 'work']
+    tutorial.value.performedActions = ['chat', 'gift', 'work']
     addLog('system', '已跳过新手引导')
   }
 
@@ -242,8 +291,24 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function initTutorial() {
-    if (tutorial.value.tutorialCompleted) return
+    if (tutorial.value.tutorialCompleted) {
+      if (tutorial.value.unlockedActions.length === 0) {
+        tutorial.value.unlockedActions = ['chat', 'gift', 'work']
+      }
+      return
+    }
+    rebuildUnlockedActionsFromSteps()
     if (tutorial.value.completedSteps.length === 0) {
+      advanceTutorial()
+    } else if (tutorial.value.currentStep) {
+      const currentIdx = gameConfig.tutorial.findIndex(s => s.id === tutorial.value.currentStep)
+      if (currentIdx >= 0 && currentIdx >= tutorial.value.completedSteps.length) {
+        const currentStepConfig = gameConfig.tutorial[currentIdx]
+        if (currentStepConfig && !checkTutorialStepCondition(currentStepConfig)) {
+          tutorial.value.currentStep = null
+        }
+      }
+    } else {
       advanceTutorial()
     }
   }
@@ -382,6 +447,7 @@ export const useGameStore = defineStore('game', () => {
     }
 
     addLog('action', message, characterId)
+    recordPerformedAction('chat')
     advanceTime()
     return true
   }
@@ -423,6 +489,7 @@ export const useGameStore = defineStore('game', () => {
     }
 
     addLog('action', message, characterId)
+    recordPerformedAction('gift')
     advanceTime()
     return true
   }
@@ -439,6 +506,7 @@ export const useGameStore = defineStore('game', () => {
     })
 
     addLog('action', `💼 打工赚了 ${earned} 代币（角色们的心情略有下降）`)
+    recordPerformedAction('work')
     advanceTime()
     return true
   }
@@ -574,6 +642,7 @@ export const useGameStore = defineStore('game', () => {
       currentStep: null,
       completedSteps: [],
       unlockedActions: [],
+      performedActions: [],
       tutorialCompleted: false,
       showGuide: false
     }
@@ -630,6 +699,8 @@ export const useGameStore = defineStore('game', () => {
     skipTutorial,
     hideTutorialGuide,
     showTutorialGuide,
-    advanceTutorial
+    advanceTutorial,
+    rebuildUnlockedActionsFromSteps,
+    recordPerformedAction
   }
 })

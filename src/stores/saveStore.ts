@@ -81,10 +81,11 @@ export const useSaveStore = defineStore('save', () => {
       gameStore.darkMode = state.darkMode
       if (state.tutorial) {
         gameStore.tutorial.currentStep = state.tutorial.currentStep
-        gameStore.tutorial.completedSteps = state.tutorial.completedSteps
-        gameStore.tutorial.unlockedActions = state.tutorial.unlockedActions
-        gameStore.tutorial.tutorialCompleted = state.tutorial.tutorialCompleted
-        gameStore.tutorial.showGuide = state.tutorial.showGuide
+        gameStore.tutorial.completedSteps = state.tutorial.completedSteps || []
+        gameStore.tutorial.performedActions = state.tutorial.performedActions || []
+        gameStore.tutorial.tutorialCompleted = state.tutorial.tutorialCompleted || false
+        gameStore.tutorial.showGuide = false
+        gameStore.rebuildUnlockedActionsFromSteps()
       }
       return true
     } catch (e) {
